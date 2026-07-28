@@ -218,8 +218,7 @@ class AuditManager:
           audit['kwargs']['url'],
         )
 
-        # Only load the page if it's not already loaded
-        browser_status = self.browser.get_if_necessary(audit['kwargs']['url'])
+        browser_status = self.browser.get(audit['kwargs']['url'])
 
         # Test for anti-bot measures
         if self.test_for_anti_bot() != 'Pass':
