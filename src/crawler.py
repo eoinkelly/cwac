@@ -503,6 +503,7 @@ class Crawler:
         break
 
       # Delay
+      # todo: is it good to use the same delay here as between full page loads?
       time.sleep(self.config.delay_between_page_loads)
 
       # Filter/sanitise the URL
@@ -576,6 +577,8 @@ class Crawler:
       if self.config.max_links_per_domain == 1:
         break
 
+      # todo: seems like it's here we would want to make sure we have waited long enough for the page to load.
+      # todo: get_links() uses only the page source so do we need to wait at all?
       links = self.get_links(base_url, url)
 
       # Add all links to the queue

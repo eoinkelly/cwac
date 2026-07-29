@@ -218,6 +218,11 @@ class AuditManager:
           audit['kwargs']['url'],
         )
 
+        # We have just changed the viewport size, so we need to reload the page
+        # to properly simulate a browser of that size visiting the page. Some
+        # websites will serve different content based on the viewport size, and
+        # we want to ensure that the audit is run on the correct version of the
+        # page.
         browser_status = self.browser.get(audit['kwargs']['url'])
 
         # Test for anti-bot measures
@@ -275,8 +280,8 @@ class AuditManager:
             self.config.viewport_sizes[viewport]['height'],
           )
 
-          # Reload the page
-          browser_status = self.browser.get_if_necessary(audit['kwargs']['url'])
+          # Reload the page because we have changed viewport size
+          browser_status = self.browser.get(audit['kwargs']['url'])
           if browser_status is False:
             logger.error(
               'After a WebDriverException .get failed on %s %s',
@@ -346,10 +351,11 @@ class AuditManager:
 
       # If we're not on the last viewport size
       if index < len(self.config.viewport_sizes) - 1:
-        # Refresh the page
+        # Refresh the page before running the audit on the next viewport size
         try:
           self.browser.driver.refresh()
           # Give browser time to adjust to viewport size
+          # eoin: todo: investigate if this sleep is necessary. It was added to fix a bug where the page would not render correctly after changing viewport size, but it may not be needed anymore.
           time.sleep(self.config.delay_between_viewports)
         except Exception:  # pylint: disable=broad-exception-caught
           logger.exception('Failed to refresh page')

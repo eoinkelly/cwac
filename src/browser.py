@@ -37,19 +37,19 @@ class Browser:
     self.driver: WebDriverType = self.spawn_single_webdriver(window_size=list(self.config.viewport_sizes.values())[0])
     self.last_url_req = ''
 
-  def get_if_necessary(self, url: str) -> bool:
-    """Load a URL in the webdriver if it is not already loaded.
+  # def get_if_necessary(self, url: str) -> bool:
+  #   """Load a URL in the webdriver if it is not already loaded.
 
-    Args:
-        url (str): url to load
+  #   Args:
+  #       url (str): url to load
 
-    Returns:
-        bool: True if page loaded, False if something went wrong
-    """
-    if self.last_url_req == url:
-      return True
+  #   Returns:
+  #       bool: True if page loaded, False if something went wrong
+  #   """
+  #   if self.last_url_req == url:
+  #     return True
 
-    return self.get(url)
+  #   return self.get(url)
 
   def get(self, url: str) -> bool:
     """Load a URL in the webdriver.
@@ -91,7 +91,8 @@ class Browser:
           logger.info('%i attempts failed to .get: %s', attempts + 1, url)
           return False
 
-    # Delay to allow page to load more
+    # Extra delay to allow page to load more
+    # todo: docuyment that this delay is in addition to waiting for onload event
     time.sleep(self.config.delay_after_page_load)
     return True
 
