@@ -1,61 +1,78 @@
 # CWAC-316
 
-This is still just rough notes.
+## Actions proposed
 
-Discover and document all locations where page loading and reloading happens
+I am proposing the following sequence of PRs for this ticket:
 
-We want to verify
+### PR: Better comments
 
-- Every time we load or reload a page, we wait for at least the window `onload`
-  event
+Code comments have been improved as a result of the planning for this ticket.
+Those changes will be shipped in a separate PR so they do not distract from
+later (more consequential) changes.
 
-every thread has it's own Browser instance. every thread has exactly one Browser
-instance
+Some error messages are also improved.
 
-Want to document how our code interacts with the Browser global.
+### PR: Remove dead code
 
-Browser is restarted between each base_url browser instance is shared global
-state between all audit plugins
+The
+[Browser.restart method](https://github.com/eoinkelly/cwac/blob/a98aedef25e8dec2a6b44fb8f4b451651c8aa3eb/src/browser.py#L118)
+is never called and should be removed
 
-Gareth and Eoin do a detailed review of the logic around page loading and
-reloading. Any improvements identified will be implemented as part of this
-ticket unless they are big . In that case we will create and size a new ticket
-for the change.
+The leftover code supporting Firefix can also be removed as part of this if the
+PO approves.
 
-Eoin has a hacked version the cwac code that fixed all the false positive
-color_contrast issues in CWAC-309. The very rough diff of those changes . will
-be expanded upon to implement that fix properly.
+### PR: Remove get_if_necessary()
 
-Lifecycle of the browser instance
+Browser.get_if_necessary() introduces complexity
 
-```
-cwac.py initialises one Browser instance per thread.
-Crawler runs `safe_restart() on the browser after processing each URL from the config.
-```
+TODO: explain this better
 
-? does crawler ever actually load the page?
+### PR: Audit AuditManager refresh + sleep
 
-TODO: does browser refresh() wait for onload? if so, do we need that delay?
-after the refresh between viewports
+Currently there is a webdriver `refresh()` plus a sleep happening at the end of
+the audit manager. See
+https://github.com/eoinkelly/cwac/blob/a98aedef25e8dec2a6b44fb8f4b451651c8aa3eb/src/audit_manager.py#L386
 
-Selenium page load strategies:
-https://www.testmuai.com/blog/selenium-page-load-strategy/
+This seems like it might not be required. Make a decision on this. If it is not
+required, remove it. If we are unsure about just removing it, we could wrap it
+in a feature flag of some kind.
 
-https://www.selenium.dev/documentation/webdriver/waits/ official docs
+### PR: Audit the `sleep()` usage
 
-We use the default which is to wait for `document.readyState = complete` (aka
-the firing of the `load` event)
+Audit all use of `sleep` in the code. If it's not clear, document what it does.
+Verify this sleep is still required.
 
-Consider adding implicitly wait
+## Open considerations
 
-```
+### No audits edge case
+
+Seems like the crawler might fail if there are no audits configured. Are we
+handling that correctly
+
+## Closed considerations
+
+### Consider adding implicitly wait
+
+Selenium has implicit and explicit wait timeouts which can be set e.g.
+
+```python
 driver.implicitly_wait(2)
 # default is 0
 ```
 
-but I don't think this will do anything for axe-core which runs inside the JS
-sandbox not in selenium
+We run axe-core by injecting it into the JS on the page so these waits would not
+help axe-core so we do not think setting Selenium waits will be impactful for
+CWAC.
 
-aside: we can set network throttling as an option to the chrome instance if we
-need to throttle
+### Network throttling Chrome is possible
+
+Unrelated to this ticket but nothing it here for visibility. We can set network
+throttling as an option to the chrome instance if we need to throttle how we
+load resources from a single page. More details in:
 https://www.selenium.dev/documentation/webdriver/browsers/chrome/
+
+## References
+
+- [Selenium page load strategies](https://www.selenium.dev/documentation/webdriver/waits/)
+  - We use the "default" page load strategy which is to wait for
+    `document.readyState = complete` (aka the firing of the `load` event)
