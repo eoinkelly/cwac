@@ -37,19 +37,21 @@ class Browser:
     self.driver: WebDriverType = self.spawn_single_webdriver(window_size=list(self.config.viewport_sizes.values())[0])
     self.last_url_req = ''
 
-  def get_if_necessary(self, url: str) -> bool:
-    """Load a URL in the webdriver if it is not already loaded.
-
-    Args:
-        url (str): url to load
-
-    Returns:
-        bool: True if page loaded, False if something went wrong
-    """
-    if self.last_url_req == url:
-      return True
-
-    return self.get(url)
+  # todo: This optimisation might add more complexity than it's worth. We should
+  # consider removing it.
+  # def get_if_necessary(self, url: str) -> bool:
+  #   """Load a URL in the webdriver if it is not already loaded.
+  #
+  #   Args:
+  #       url (str): url to load
+  #
+  #   Returns:
+  #       bool: True if page loaded, False if something went wrong
+  #   """
+  #   if self.last_url_req == url:
+  #     return True
+  #
+  #   return self.get(url)
 
   def get(self, url: str) -> bool:
     """Load a URL in the webdriver.
@@ -91,7 +93,8 @@ class Browser:
           logger.info('%i attempts failed to .get: %s', attempts + 1, url)
           return False
 
-    # Delay to allow page to load more
+    # Extra delay to allow page to load more
+    # todo: docuyment that this delay is in addition to waiting for onload event
     time.sleep(self.config.delay_after_page_load)
     return True
 
@@ -111,23 +114,30 @@ class Browser:
     self.driver = self.spawn_single_webdriver(window_size=self.viewport_size)
     self.last_url_req = ''
 
-  def restart(self) -> None:
-    """Restart the webdriver and restore its dimensions."""
-    try:
-      window_pos = self.driver.get_window_position()
-      window_size = self.driver.get_window_size()
-      self.driver.close()
-      new_driver: WebDriverType = self.spawn_single_webdriver(window_size=window_size)
-      new_driver.set_window_position(**window_pos)
-      new_driver.set_window_size(**window_size)
-      self.driver = new_driver
-      self.last_url_req = ''
-    except Exception:  # pylint: disable=broad-exception-caught
-      logger.exception('Unhandled exception')
-      self.safe_restart()
+  # todo: this does not seem to be called anywhere. Do we want to remove it?
+  # def restart(self) -> None:
+  #   """Restart the webdriver and restore its dimensions."""
+  #   try:
+  #     window_pos = self.driver.get_window_position()
+  #     window_size = self.driver.get_window_size()
+  #     self.driver.close()
+  #     new_driver: WebDriverType = self.spawn_single_webdriver(window_size=window_size)
+
+  #     # todo: this is the only meaninful difference between this and safe_restart. Do we want to restore the window position? If so, should we also restore the window size?
+  #     new_driver.set_window_position(**window_pos)
+
+  #     new_driver.set_window_size(**window_size) # todo: is this necessary? we already set the window size when spawning the driver
+  #     self.driver = new_driver
+  #     self.last_url_req = ''
+  #   except Exception:  # pylint: disable=broad-exception-caught
+  #     logger.exception('Unhandled exception')
+  #     self.safe_restart()
 
   def get_doctype(self) -> str:
-    """Get the doctype of the currently loaded page in the webdriver.
+    """Get the doctype of the currently loaded page.
+
+    This function does not load the page, it assumes that the page is already
+    loaded in the webdriver.
 
     Returns:
         str: the doctype of the loaded page
@@ -152,7 +162,10 @@ class Browser:
     return doctype_string
 
   def get_base_uri(self) -> str:
-    """Returns document.baseURI of current page.
+    """Returns document.baseURI of currently loaded page.
+
+    This function does not load the page, it assumes that the page is already
+    loaded in the webdriver.
 
     Returns:
         str: base URI of current page.
@@ -165,9 +178,12 @@ class Browser:
       raise exc
 
   def get_page_source(self) -> str:
-    """Return the browser's page source.
+    """Return HTML source of currently loaded page.
 
-    Return:
+    This function does not load the page, it assumes that the page is already
+    loaded in the webdriver.
+
+    Returns:
         str: page source
     """
     try:
@@ -298,6 +314,7 @@ class Browser:
 
       driver = webdriver.Chrome(service=chrome_service, options=chrome_options)
 
+    # todo: do we want to support other browsers? should this be removed?
     # Sets up a Firefox instance
     if self.config.browser == 'firefox':
       firefox_options = FirefoxOptions()

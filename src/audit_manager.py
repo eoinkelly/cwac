@@ -56,16 +56,17 @@ class AuditManager:
     }
 
   def test_for_anti_bot(self) -> str:
-    """Inspect the page for anti-bot blocking.
+    """Inspect the currently loaded page for anti-bot blocking.
 
-    Write the result to an 'anti_bot' CSV file.
+    If bot blocking services such as Cloudflare, Incapsula, Azure Front Door,
+    etc. are detected then:
+
+    1. A screenshot is saved to the 'anti_bot_ss' folder.
+    2. The result is written to an 'anti_bot.csv' file.
+    3. The URL is added to the discarded_urls dict with the reason for discarding.
 
     Returns:
-        str: 'Pass' if no anti-bot blocking detected,
-        'Imperva' if Incapsula detected, 'Cloudflare'
-        if Cloudflare detected. 'Blocked' if the URL
-        has already been discarded. 'Azure Front Door'
-        if Azure Front Door detected.
+      str: 'Pass'|'Imperva'|'Cloudflare'|'Blocked'|'Azure Front Door'|'Red Shield'|'Cloudfront'
     """
     # Get the current URL
     try:
@@ -153,7 +154,13 @@ class AuditManager:
     return status
 
   def check_for_details_elements(self) -> None:
-    """Check if there are <details> elements that should be opened so their contents are audited."""
+    """Open <details> elements on current page if force_open_details_elements is True.
+
+    Find all <details> elements on the page. If any are found, and if the config
+    option force_open_details_elements is True, open them by setting their
+    'open' attribute to an empty string. This ensures that the contents of the
+    <details> elements are visible and can be audited.
+    """
     details = self.browser.driver.find_elements(By.TAG_NAME, 'details')
 
     if len(details) == 0:
@@ -180,6 +187,27 @@ class AuditManager:
 
   def run_audits(self) -> bool:  # noqa: PLR0912, PLR0915
     """Iterate through registered audits and runs them.
+
+    Main entry point for running audits. Iterates through all registered audits
+    and runs them on the current page. Each audit is run for each viewport size
+    specified in the config.
+
+    For each configured viewport size:
+
+    1. The browser window is resized to the specified dimensions.
+    2. For each audit configured to run at the current viewport size:
+      1. The page is loaded
+      2. The antibot check is run. If the page is blocked, the audit is skipped.
+      3. Any details elements on the page are opened if force_open_details_elements is True.
+      4. The audit is run and the results are written to a CSV file.
+    3. The browser is refreshed. If the refresh fails, the browser is restarted.
+
+    If an exception is raised during the execution of an audit, then the browser
+    state is reset for the next audit:
+
+    1. The browser is restarted.
+    2. the viewport size is set again.
+    3. The page is loaded again via `self.browser.get()`.
 
     Returns:
         bool: True if at least one audit successfully produced results, else False
@@ -218,8 +246,12 @@ class AuditManager:
           audit['kwargs']['url'],
         )
 
-        # Only load the page if it's not already loaded
-        browser_status = self.browser.get_if_necessary(audit['kwargs']['url'])
+        # We have just changed the viewport size, so we need to reload the page
+        # to properly simulate a browser of that size visiting the page. Some
+        # websites will serve different content based on the viewport size, and
+        # we want to ensure that the audit is run on the correct version of the
+        # page.
+        browser_status = self.browser.get(audit['kwargs']['url'])
 
         # Test for anti-bot measures
         if self.test_for_anti_bot() != 'Pass':
@@ -276,8 +308,8 @@ class AuditManager:
             self.config.viewport_sizes[viewport]['height'],
           )
 
-          # Reload the page
-          browser_status = self.browser.get_if_necessary(audit['kwargs']['url'])
+          # Reload the page because we have changed viewport size
+          browser_status = self.browser.get(audit['kwargs']['url'])
           if browser_status is False:
             logger.error(
               'After a WebDriverException .get failed on %s %s',
@@ -347,10 +379,14 @@ class AuditManager:
 
       # If we're not on the last viewport size
       if index < len(self.config.viewport_sizes) - 1:
-        # Refresh the page
+        # Refresh the page before running the audit on the next viewport size
         try:
+          # TODO: why refresh here? we haven't changed the viewport size yet.
+          # refresh() is the equivalent of hitting the refresh button in the browser. It reloads the current page.
           self.browser.driver.refresh()
           # Give browser time to adjust to viewport size
+          # eoin: todo: investigate if this sleep is necessary. It was added to fix a bug where the page would not render correctly after changing viewport size, but it may not be needed anymore.
+          # this is kinda a "wait for browser to finish refresh() before running the next audit" sleep, but it may not be necessary anymore.
           time.sleep(self.config.delay_between_viewports)
         except Exception:  # pylint: disable=broad-exception-caught
           logger.exception('Failed to refresh page')

@@ -16,7 +16,6 @@ Disclaimer:
 
 import logging
 import sys
-import time
 from typing import Any
 
 from config import Config
@@ -70,11 +69,14 @@ class ReflowAudit(DefaultAudit):
       print('Width was ' + str(self.browser.driver.get_window_size()['width']))
       sys.exit(1)
 
-    # Only load the page if it's not already loaded
-    self.browser.get_if_necessary(self.url)
+    # Reload the page to be confident we are testing a fresh page at the correct viewport size.
+    self.browser.get(self.url)
 
-    # Wait for the page to render
-    time.sleep(0.3)
+    # time.sleep(0.3) # eoin: no sleep required because get() takes care of waiting
+    # eoin: I don't fully understand the old behaviour here. If
+    # `get_if_necessary` was used, it would have already waited for the page to
+    # load. If `get` was used, it also waits for the page to load. So this sleep
+    # seems unnecessary?
 
     # Determine if there is a horisontal overflow
     try:
